@@ -151,13 +151,15 @@
       overflow: hidden;
     }
     .viewer-header {
-      padding: 14px 24px 12px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
+      gap: 12px;
     }
+    .viewer-header-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .viewer-header .meta {
       font-size: 12px;
       color: var(--text3);
@@ -530,6 +532,38 @@
       text-align: center;
     }
     .expand-btn:hover { color: var(--text); border-color: var(--purple); }
+
+    /* Collapsible message bubble */
+    .msg-bubble-inner {
+      position: relative;
+      overflow: hidden;
+    }
+    .msg-bubble-inner.is-collapsed {
+      max-height: 260px;
+    }
+    .msg-bubble-grad {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 70px;
+      background: linear-gradient(transparent, rgba(22,22,31,0.96));
+      pointer-events: none;
+    }
+    .msg-bubble-toggle {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      font-size: 12px;
+      padding: 5px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      text-align: center;
+    }
+    .msg-bubble-toggle:hover { color: var(--text); border-color: var(--purple); }
   </style>
 </head>
 <body>
@@ -569,7 +603,10 @@
   <div class="viewer-panel">
     <div class="viewer-header" id="viewer-header" style="display:none">
       <div class="meta" id="viewer-meta"></div>
-      <button class="btn" id="btn-collapse-all">全部折叠</button>
+      <div class="viewer-header-actions">
+        <button class="btn" id="btn-expand-all">全部展开</button>
+        <button class="btn" id="btn-collapse-all">全部折叠</button>
+      </div>
     </div>
     <div class="viewer-toolbar" id="viewer-toolbar" style="display:none">
       <button class="filter-btn active" data-role="all">全部</button>
@@ -1050,10 +1087,30 @@ function renderMessages(messages) {
           ${msg.name ? `<span style="font-family:monospace;font-size:10px;color:var(--green)">${esc(msg.name)}</span>` : ''}
         </div>
         <div class="msg-bubble">
-          ${bodyHtml || '<span style="color:var(--text3);font-style:italic">（无内容）</span>'}
+          <div class="msg-bubble-inner">
+            ${bodyHtml || '<span style="color:var(--text3);font-style:italic">（无内容）</span>'}
+          </div>
         </div>
       </div>`;
     container.appendChild(row);
+
+    // Collapse tall bubbles
+    const inner = row.querySelector('.msg-bubble-inner');
+    if (inner && inner.scrollHeight > 300) {
+      inner.classList.add('is-collapsed');
+      const grad = document.createElement('div');
+      grad.className = 'msg-bubble-grad';
+      inner.appendChild(grad);
+      const toggle = document.createElement('button');
+      toggle.className = 'msg-bubble-toggle';
+      toggle.textContent = '▼ 展开';
+      toggle.onclick = () => {
+        const collapsed = inner.classList.toggle('is-collapsed');
+        grad.style.display = collapsed ? '' : 'none';
+        toggle.textContent = collapsed ? '▼ 展开' : '▲ 收起';
+      };
+      inner.parentElement.appendChild(toggle);
+    }
   });
 
   // Update header stats
@@ -1114,12 +1171,30 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-// ── Collapse all ──────────────────────────────────────────────────────────────
+// ── Collapse / expand all ─────────────────────────────────────────────────────
 document.getElementById('btn-collapse-all').addEventListener('click', () => {
-  const allBodies = document.querySelectorAll('[id$="-b"]');
-  const allHeaders = document.querySelectorAll('[id$="-h"]');
-  allBodies.forEach(b => b.classList.add('hidden'));
-  allHeaders.forEach(h => h.classList.add('collapsed'));
+  document.querySelectorAll('[id$="-b"]').forEach(b => b.classList.add('hidden'));
+  document.querySelectorAll('[id$="-h"]').forEach(h => h.classList.add('collapsed'));
+  document.querySelectorAll('.msg-bubble-inner').forEach(inner => {
+    if (inner.querySelector('.msg-bubble-grad')) {
+      inner.classList.add('is-collapsed');
+      inner.querySelector('.msg-bubble-grad').style.display = '';
+      const toggle = inner.parentElement.querySelector('.msg-bubble-toggle');
+      if (toggle) toggle.textContent = '▼ 展开';
+    }
+  });
+});
+
+document.getElementById('btn-expand-all').addEventListener('click', () => {
+  document.querySelectorAll('[id$="-b"]').forEach(b => b.classList.remove('hidden'));
+  document.querySelectorAll('[id$="-h"]').forEach(h => h.classList.remove('collapsed'));
+  document.querySelectorAll('.msg-bubble-inner').forEach(inner => {
+    inner.classList.remove('is-collapsed');
+    const grad = inner.querySelector('.msg-bubble-grad');
+    if (grad) grad.style.display = 'none';
+    const toggle = inner.parentElement.querySelector('.msg-bubble-toggle');
+    if (toggle) toggle.textContent = '▲ 收起';
+  });
 });
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
