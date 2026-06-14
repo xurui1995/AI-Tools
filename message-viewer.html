@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Messages 可视化 — AI 工具箱</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --bg2: #16161f;
+      --bg3: #1a1a26;
+      --border: #1e1e2e;
+      --border2: #2a2a3e;
+      --text: #e8e8f0;
+      --text2: #9898b8;
+      --text3: #5a5a7a;
+      --purple: #7c6af7;
+      --purple2: #a78bfa;
+      --green: #4ade80;
+      --yellow: #facc15;
+      --blue: #60a5fa;
+      --orange: #fb923c;
+      --red: #f87171;
+      --teal: #2dd4bf;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    header a {
+      text-decoration: none;
+      color: var(--text3);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s;
+    }
+    header a:hover { color: var(--text2); }
+    header .sep { color: var(--border2); }
+    header .title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 49px);
+      overflow: hidden;
+    }
+
+    /* ── Left panel: input ── */
+    .input-panel {
+      width: 380px;
+      min-width: 300px;
+      max-width: 480px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      resize: horizontal;
+      overflow: auto;
+    }
+    .panel-header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .panel-header .actions { display: flex; gap: 8px; }
+    .btn {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: var(--bg3);
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn:hover { border-color: var(--purple); color: var(--text); }
+    .btn-primary {
+      background: var(--purple);
+      border-color: var(--purple);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--purple2); border-color: var(--purple2); color: #fff; }
+
+    #json-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      color: var(--text);
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      padding: 16px;
+      min-height: 0;
+    }
+    #json-input::placeholder { color: var(--text3); }
+
+    .input-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .error-msg {
+      font-size: 12px;
+      color: var(--red);
+      flex: 1;
+    }
+
+    /* ── Right panel: viewer ── */
+    .viewer-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .viewer-header {
+      padding: 14px 24px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .viewer-header .meta {
+      font-size: 12px;
+      color: var(--text3);
+      display: flex;
+      gap: 16px;
+    }
+    .viewer-header .meta span { display: flex; align-items: center; gap: 5px; }
+    .viewer-header .meta b { color: var(--text2); }
+
+    .viewer-toolbar {
+      padding: 8px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .filter-btn {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      border-color: var(--purple);
+      color: var(--purple2);
+      background: rgba(124,106,247,0.08);
+    }
+
+    #messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Empty / placeholder state ── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--text3);
+      text-align: center;
+      padding: 40px;
+    }
+    .empty-state .icon { font-size: 48px; opacity: 0.4; }
+    .empty-state h2 { font-size: 18px; font-weight: 600; color: var(--text2); }
+    .empty-state p { font-size: 14px; line-height: 1.6; max-width: 380px; }
+    .sample-btn {
+      margin-top: 8px;
+      font-size: 13px;
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      background: var(--bg3);
+      color: var(--purple2);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .sample-btn:hover { border-color: var(--purple); background: rgba(124,106,247,0.1); }
+
+    /* ── Message bubbles ── */
+    .msg-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: none; } }
+
+    .msg-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+
+    .msg-body { flex: 1; min-width: 0; }
+    .msg-meta {
+      font-size: 11px;
+      color: var(--text3);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .msg-meta .role-label {
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .msg-meta .msg-index {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 10px;
+    }
+
+    .msg-bubble {
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      line-height: 1.7;
+      word-break: break-word;
+    }
+
+    /* Role-specific styles */
+    .role-system .msg-avatar  { background: rgba(251,146,60,0.15); color: var(--orange); }
+    .role-system .msg-meta .role-label { color: var(--orange); }
+    .role-system .msg-bubble  { background: rgba(251,146,60,0.06); border: 1px solid rgba(251,146,60,0.15); }
+
+    .role-user .msg-avatar  { background: rgba(96,165,250,0.15); color: var(--blue); }
+    .role-user .msg-meta .role-label { color: var(--blue); }
+    .role-user .msg-bubble  { background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.15); }
+
+    .role-assistant .msg-avatar  { background: rgba(124,106,247,0.15); color: var(--purple); }
+    .role-assistant .msg-meta .role-label { color: var(--purple2); }
+    .role-assistant .msg-bubble  { background: rgba(124,106,247,0.06); border: 1px solid rgba(124,106,247,0.18); }
+
+    .role-tool .msg-avatar  { background: rgba(74,222,128,0.12); color: var(--green); }
+    .role-tool .msg-meta .role-label { color: var(--green); }
+    .role-tool .msg-bubble  { background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.15); }
+
+    .role-developer .msg-avatar  { background: rgba(45,212,191,0.12); color: var(--teal); }
+    .role-developer .msg-meta .role-label { color: var(--teal); }
+    .role-developer .msg-bubble  { background: rgba(45,212,191,0.05); border: 1px solid rgba(45,212,191,0.15); }
+
+    /* ── Content blocks ── */
+    .content-text { white-space: pre-wrap; }
+
+    /* Thinking block */
+    .block-thinking {
+      border: 1px solid rgba(250,204,21,0.2);
+      border-radius: 8px;
+      background: rgba(250,204,21,0.04);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .block-thinking-header {
+      padding: 7px 12px;
+      background: rgba(250,204,21,0.07);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--yellow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .block-thinking-header .chevron { transition: transform 0.2s; font-style: normal; }
+    .block-thinking-header.collapsed .chevron { transform: rotate(-90deg); }
+    .block-thinking-content {
+      padding: 10px 12px;
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: var(--text2);
+      white-space: pre-wrap;
+      font-family: "SF Mono", "Fira Code", monospace;
+      border-top: 1px solid rgba(250,204,21,0.1);
+    }
+    .block-thinking-content.hidden { display: none; }
+
+    /* Tool call block */
+    .block-tool-call {
+      border: 1px solid rgba(124,106,247,0.25);
+      border-radius: 8px;
+      background: rgba(124,106,247,0.04);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .block-tool-call-header {
+      padding: 8px 12px;
+      background: rgba(124,106,247,0.08);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .block-tool-call-header .tool-name {
+      font-weight: 600;
+      color: var(--purple2);
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+    .block-tool-call-header .tool-id {
+      font-size: 10px;
+      color: var(--text3);
+      font-family: "SF Mono", "Fira Code", monospace;
+      margin-left: auto;
+    }
+    .block-tool-call-header .chevron { transition: transform 0.2s; font-style: normal; color: var(--text3); }
+    .block-tool-call-header.collapsed .chevron { transform: rotate(-90deg); }
+    .block-tool-call-body { border-top: 1px solid rgba(124,106,247,0.15); }
+    .block-tool-call-body.hidden { display: none; }
+    .json-viewer {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text2);
+      overflow-x: auto;
+    }
+
+    /* Tool result block */
+    .block-tool-result {
+      border: 1px solid rgba(74,222,128,0.2);
+      border-radius: 8px;
+      background: rgba(74,222,128,0.03);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .block-tool-result-header {
+      padding: 7px 12px;
+      background: rgba(74,222,128,0.07);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .block-tool-result-header .tool-id { font-weight: 400; color: var(--text3); font-family: "SF Mono", "Fira Code", monospace; font-size: 10px; }
+    .block-tool-result-header .chevron { transition: transform 0.2s; font-style: normal; margin-left: auto; }
+    .block-tool-result-header.collapsed .chevron { transform: rotate(-90deg); }
+    .block-tool-result-body { border-top: 1px solid rgba(74,222,128,0.1); }
+    .block-tool-result-body.hidden { display: none; }
+
+    /* Image block */
+    .block-image img {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 8px;
+      margin: 4px 0;
+      border: 1px solid var(--border2);
+    }
+
+    /* Refusal */
+    .block-refusal {
+      color: var(--red);
+      font-style: italic;
+      font-size: 13px;
+      padding: 6px 0;
+    }
+
+    /* Error badge */
+    .block-error-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--red);
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      margin-left: 6px;
+    }
+
+    /* Usage badge */
+    .usage-bar {
+      margin-top: 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .usage-chip {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text3);
+    }
+    .usage-chip b { color: var(--text2); }
+
+    /* JSON syntax highlighting */
+    .jk { color: #a78bfa; }   /* key */
+    .js { color: #86efac; }   /* string value */
+    .jn { color: #fdba74; }   /* number */
+    .jb { color: #60a5fa; }   /* bool */
+    .jnu { color: var(--text3); } /* null */
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a5e; }
+
+    /* Hidden helper */
+    .hidden { display: none !important; }
+
+    /* Divider for long system prompts etc */
+    .msg-bubble .content-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 10px 0;
+    }
+
+    /* Collapsible long text */
+    .long-text-wrapper { position: relative; }
+    .long-text-fade {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: linear-gradient(transparent, rgba(22,22,31,0.95));
+      pointer-events: none;
+    }
+    .expand-btn {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 5px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      text-align: center;
+    }
+    .expand-btn:hover { color: var(--text); border-color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← AI 工具箱</a>
+  <span class="sep">/</span>
+  <span class="title">💬 Messages 可视化</span>
+</header>
+
+<div class="app">
+  <!-- Left: JSON input -->
+  <div class="input-panel">
+    <div class="panel-header">
+      JSON 输入
+      <div class="actions">
+        <button class="btn" id="btn-clear">清空</button>
+        <button class="btn" id="btn-sample">示例</button>
+      </div>
+    </div>
+    <textarea id="json-input" spellcheck="false"
+      placeholder='粘贴 OpenAI 或 Anthropic 格式的 messages JSON 数组...
+
+例如:
+[
+  {"role": "system", "content": "You are a helpful assistant."},
+  {"role": "user", "content": "Hello!"},
+  {"role": "assistant", "content": "Hi there!"}
+]'></textarea>
+    <div class="input-footer">
+      <span class="error-msg" id="error-msg"></span>
+      <button class="btn btn-primary" id="btn-parse">渲染 ▶</button>
+    </div>
+  </div>
+
+  <!-- Right: viewer -->
+  <div class="viewer-panel">
+    <div class="viewer-header" id="viewer-header" style="display:none">
+      <div class="meta" id="viewer-meta"></div>
+      <button class="btn" id="btn-collapse-all">全部折叠</button>
+    </div>
+    <div class="viewer-toolbar" id="viewer-toolbar" style="display:none">
+      <button class="filter-btn active" data-role="all">全部</button>
+      <button class="filter-btn" data-role="system">System</button>
+      <button class="filter-btn" data-role="user">User</button>
+      <button class="filter-btn" data-role="assistant">Assistant</button>
+      <button class="filter-btn" data-role="tool">Tool</button>
+    </div>
+    <div id="messages-container">
+      <div class="empty-state">
+        <div class="icon">💬</div>
+        <h2>Messages 可视化工具</h2>
+        <p>将 OpenAI 或 Anthropic 格式的 <code style="font-family:monospace;color:var(--purple2)">messages</code> JSON 数组粘贴到左侧，点击「渲染」查看可视化对话。</p>
+        <p style="margin-top:8px;font-size:12px">支持：多角色 · 工具调用 · 工具结果 · Thinking 块 · 图片 · 嵌套内容</p>
+        <button class="sample-btn" id="btn-sample2">载入示例数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Role config ──────────────────────────────────────────────────────────────
+const ROLE_CONFIG = {
+  system:    { label: 'System',    abbr: 'SYS', emoji: '⚙️' },
+  user:      { label: 'User',      abbr: 'USR', emoji: '👤' },
+  assistant: { label: 'Assistant', abbr: 'AI',  emoji: '🤖' },
+  tool:      { label: 'Tool',      abbr: 'FN',  emoji: '🔧' },
+  developer: { label: 'Developer', abbr: 'DEV', emoji: '🛠️' },
+  function:  { label: 'Function',  abbr: 'FN',  emoji: '🔧' },
+};
+
+// ── Sample data ──────────────────────────────────────────────────────────────
+const SAMPLE = [
+  {
+    "role": "system",
+    "content": "You are a helpful coding assistant. When users ask about code, use the available tools to search for documentation and run code examples."
+  },
+  {
+    "role": "user",
+    "content": "Can you help me write a Python function to calculate fibonacci numbers efficiently? Please search for the best approach first."
+  },
+  {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+      {
+        "id": "call_abc123",
+        "type": "function",
+        "function": {
+          "name": "search_documentation",
+          "arguments": "{\"query\": \"fibonacci sequence efficient algorithms python\", \"max_results\": 3}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_abc123",
+    "content": "Found 3 results:\n1. Dynamic Programming approach: O(n) time, O(1) space using iterative method\n2. Memoization with @functools.lru_cache decorator\n3. Matrix exponentiation for O(log n) time complexity"
+  },
+  {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+      {
+        "id": "call_def456",
+        "type": "function",
+        "function": {
+          "name": "run_code",
+          "arguments": "{\"language\": \"python\", \"code\": \"import functools\\n\\n@functools.lru_cache(maxsize=None)\\ndef fib_memo(n):\\n    if n < 2:\\n        return n\\n    return fib_memo(n-1) + fib_memo(n-2)\\n\\ndef fib_iter(n):\\n    a, b = 0, 1\\n    for _ in range(n):\\n        a, b = b, a + b\\n    return a\\n\\nprint([fib_iter(i) for i in range(10)])\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_def456",
+    "content": "[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\nExecution time: 0.002ms"
+  },
+  {
+    "role": "assistant",
+    "content": "Here are two efficient approaches for calculating Fibonacci numbers in Python:\n\n**1. Iterative (O(n) time, O(1) space) — Best for most cases:**\n```python\ndef fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```\n\n**2. Memoized recursive (O(n) time, O(n) space) — Clean and readable:**\n```python\nimport functools\n\n@functools.lru_cache(maxsize=None)\ndef fib(n):\n    if n < 2:\n        return n\n    return fib(n-1) + fib(n-2)\n```\n\nI ran the iterative version and confirmed it works correctly: `[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]`\n\nFor most use cases, the iterative approach is recommended since it uses constant space and avoids recursion limits."
+  },
+  {
+    "role": "user",
+    "content": "Great! What about an Anthropic-style message with tool_use blocks?"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "The user wants to see how Anthropic-format content blocks look in this visualizer. I should demonstrate the tool_use content block format which is used in Anthropic's API."
+      },
+      {
+        "type": "text",
+        "text": "Anthropic's API uses content blocks instead of top-level tool_calls. Here's what a response with a tool_use block looks like:"
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01XY",
+        "name": "calculator",
+        "input": {
+          "expression": "fib(20)",
+          "precision": 10
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "tool_result",
+        "tool_use_id": "toolu_01XY",
+        "content": "6765"
+      },
+      {
+        "type": "text",
+        "text": "Perfect. Thanks for showing both formats!"
+      }
+    ]
+  }
+];
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function syntaxHighlight(json) {
+  if (typeof json !== 'string') json = JSON.stringify(json, null, 2);
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+    if (/^"/.test(m)) {
+      if (/:$/.test(m)) return `<span class="jk">${esc(m)}</span>`;
+      return `<span class="js">${esc(m)}</span>`;
+    }
+    if (/true|false/.test(m)) return `<span class="jb">${m}</span>`;
+    if (/null/.test(m)) return `<span class="jnu">${m}</span>`;
+    return `<span class="jn">${m}</span>`;
+  });
+}
+
+let collapseState = {}; // id -> bool collapsed
+let blockIdCounter = 0;
+function newId() { return 'blk' + (++blockIdCounter); }
+
+function toggleBlock(id) {
+  const header = document.getElementById(id + '-h');
+  const body   = document.getElementById(id + '-b');
+  if (!header || !body) return;
+  const isCollapsed = body.classList.toggle('hidden');
+  header.classList.toggle('collapsed', isCollapsed);
+}
+
+// ── Render a single content value (string or content block array) ─────────────
+function renderContent(content, role) {
+  if (content === null || content === undefined) return '';
+
+  // Plain string
+  if (typeof content === 'string') {
+    if (!content.trim()) return '<span style="color:var(--text3);font-style:italic">（空内容）</span>';
+    return renderLongText(esc(content));
+  }
+
+  // Array of content blocks (Anthropic style)
+  if (Array.isArray(content)) {
+    return content.map(block => renderBlock(block, role)).join('');
+  }
+
+  // Fallback: show raw
+  return `<div class="json-viewer">${syntaxHighlight(content)}</div>`;
+}
+
+function renderLongText(escapedText, maxLines = 25) {
+  const lines = escapedText.split('\n');
+  if (lines.length <= maxLines) {
+    return `<div class="content-text">${escapedText}</div>`;
+  }
+  const id = newId();
+  const preview = lines.slice(0, maxLines).join('\n');
+  return `
+    <div class="long-text-wrapper" id="${id}-wrap">
+      <div class="content-text" id="${id}-text" style="max-height:400px;overflow:hidden;position:relative">
+        ${escapedText}
+        <div class="long-text-fade" id="${id}-fade"></div>
+      </div>
+      <button class="expand-btn" onclick="expandText('${id}')">▼ 展开全部 (${lines.length} 行)</button>
+    </div>`;
+}
+
+function expandText(id) {
+  const text = document.getElementById(id + '-text');
+  const fade = document.getElementById(id + '-fade');
+  const btn  = text.nextElementSibling || text.parentElement.querySelector('.expand-btn');
+  if (text) text.style.maxHeight = 'none';
+  if (fade) fade.remove();
+  const expandBtn = document.getElementById(id + '-wrap')?.querySelector('.expand-btn');
+  if (expandBtn) expandBtn.remove();
+}
+
+function renderBlock(block, role) {
+  if (!block || typeof block !== 'object') return esc(String(block));
+  const type = block.type;
+
+  // ── Thinking ──
+  if (type === 'thinking') {
+    const id = newId();
+    const text = block.thinking || block.content || '';
+    return `
+      <div class="block-thinking">
+        <div class="block-thinking-header" id="${id}-h" onclick="toggleBlock('${id}')">
+          <span>💭</span> <span>Thinking</span>
+          <em class="chevron" style="margin-left:auto">▾</em>
+        </div>
+        <div class="block-thinking-content" id="${id}-b">
+          ${renderLongText(esc(text), 15)}
+        </div>
+      </div>`;
+  }
+
+  // ── Text ──
+  if (type === 'text') {
+    const txt = block.text || '';
+    return `<div class="content-text" style="margin-bottom:6px">${renderLongText(esc(txt))}</div>`;
+  }
+
+  // ── Tool use (Anthropic) ──
+  if (type === 'tool_use') {
+    const id = newId();
+    const inputJson = JSON.stringify(block.input || {}, null, 2);
+    return `
+      <div class="block-tool-call">
+        <div class="block-tool-call-header" id="${id}-h" onclick="toggleBlock('${id}')">
+          <span>⚡</span>
+          <span class="tool-name">${esc(block.name || 'unknown')}</span>
+          <span class="tool-id">${esc(block.id || '')}</span>
+          <em class="chevron">▾</em>
+        </div>
+        <div class="block-tool-call-body" id="${id}-b">
+          <div class="json-viewer">${syntaxHighlight(inputJson)}</div>
+        </div>
+      </div>`;
+  }
+
+  // ── Tool result (Anthropic) ──
+  if (type === 'tool_result') {
+    const id = newId();
+    const content = block.content;
+    const isError = block.is_error;
+    const resultHtml = typeof content === 'string'
+      ? `<div class="json-viewer" style="white-space:pre-wrap">${esc(content)}</div>`
+      : `<div class="json-viewer">${syntaxHighlight(content)}</div>`;
+    return `
+      <div class="block-tool-result">
+        <div class="block-tool-result-header" id="${id}-h" onclick="toggleBlock('${id}')">
+          <span>📤</span>
+          <span>Tool Result</span>
+          <span class="tool-id">${esc(block.tool_use_id || '')}</span>
+          ${isError ? '<span class="block-error-badge">⚠ error</span>' : ''}
+          <em class="chevron">▾</em>
+        </div>
+        <div class="block-tool-result-body" id="${id}-b">
+          ${resultHtml}
+        </div>
+      </div>`;
+  }
+
+  // ── Image ──
+  if (type === 'image') {
+    const src = block.source;
+    if (src?.type === 'base64') {
+      return `<div class="block-image"><img src="data:${src.media_type};base64,${src.data}" alt="image"/></div>`;
+    }
+    if (src?.type === 'url') {
+      return `<div class="block-image"><img src="${esc(src.url)}" alt="image"/></div>`;
+    }
+    return `<div class="json-viewer">${syntaxHighlight(block)}</div>`;
+  }
+
+  // ── Refusal ──
+  if (type === 'refusal') {
+    return `<div class="block-refusal">⛔ ${esc(block.refusal || '')}</div>`;
+  }
+
+  // ── Fallback: raw JSON ──
+  return `<div class="json-viewer">${syntaxHighlight(block)}</div>`;
+}
+
+function renderToolCalls(toolCalls) {
+  if (!toolCalls || !toolCalls.length) return '';
+  return toolCalls.map(tc => {
+    const id = newId();
+    const fn = tc.function || {};
+    let argsHtml;
+    try {
+      const parsed = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
+      argsHtml = syntaxHighlight(JSON.stringify(parsed, null, 2));
+    } catch {
+      argsHtml = esc(fn.arguments || '');
+    }
+    return `
+      <div class="block-tool-call">
+        <div class="block-tool-call-header" id="${id}-h" onclick="toggleBlock('${id}')">
+          <span>⚡</span>
+          <span class="tool-name">${esc(fn.name || tc.name || 'unknown')}</span>
+          <span class="tool-id">${esc(tc.id || '')}</span>
+          <em class="chevron">▾</em>
+        </div>
+        <div class="block-tool-call-body" id="${id}-b">
+          <div class="json-viewer">${argsHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderToolResult(msg) {
+  // OpenAI tool role message
+  const id = newId();
+  const content = msg.content;
+  const isError = msg.is_error;
+  const resultHtml = typeof content === 'string'
+    ? `<div class="json-viewer" style="white-space:pre-wrap">${renderLongText(esc(content))}</div>`
+    : `<div class="json-viewer">${syntaxHighlight(content)}</div>`;
+  return `
+    <div class="block-tool-result">
+      <div class="block-tool-result-header" id="${id}-h" onclick="toggleBlock('${id}')">
+        <span>📤</span>
+        <span>Tool Result</span>
+        <span class="tool-id">${esc(msg.tool_call_id || msg.name || '')}</span>
+        ${isError ? '<span class="block-error-badge">⚠ error</span>' : ''}
+        <em class="chevron">▾</em>
+      </div>
+      <div class="block-tool-result-body" id="${id}-b">
+        ${resultHtml}
+      </div>
+    </div>`;
+}
+
+function renderUsage(usage) {
+  if (!usage) return '';
+  const chips = [];
+  if (usage.prompt_tokens !== undefined) chips.push(`<span class="usage-chip">输入 <b>${usage.prompt_tokens}</b> tokens</span>`);
+  if (usage.input_tokens !== undefined) chips.push(`<span class="usage-chip">输入 <b>${usage.input_tokens}</b> tokens</span>`);
+  if (usage.completion_tokens !== undefined) chips.push(`<span class="usage-chip">输出 <b>${usage.completion_tokens}</b> tokens</span>`);
+  if (usage.output_tokens !== undefined) chips.push(`<span class="usage-chip">输出 <b>${usage.output_tokens}</b> tokens</span>`);
+  if (usage.total_tokens !== undefined) chips.push(`<span class="usage-chip">总计 <b>${usage.total_tokens}</b> tokens</span>`);
+  if (!chips.length) return '';
+  return `<div class="usage-bar">${chips.join('')}</div>`;
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+let parsedMessages = [];
+
+function renderMessages(messages) {
+  parsedMessages = messages;
+  blockIdCounter = 0;
+  const container = document.getElementById('messages-container');
+  container.innerHTML = '';
+
+  if (!messages.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🤷</div><h2>空数组</h2><p>messages 数组为空。</p></div>';
+    return;
+  }
+
+  // Count stats
+  const roleCounts = {};
+  let toolCallCount = 0;
+
+  messages.forEach((msg, idx) => {
+    const role = (msg.role || 'unknown').toLowerCase();
+    roleCounts[role] = (roleCounts[role] || 0) + 1;
+    if (msg.tool_calls?.length) toolCallCount += msg.tool_calls.length;
+    if (Array.isArray(msg.content)) {
+      msg.content.forEach(b => { if (b.type === 'tool_use') toolCallCount++; });
+    }
+
+    const cfg = ROLE_CONFIG[role] || { label: role, abbr: role.slice(0,3).toUpperCase(), emoji: '❓' };
+    const row = document.createElement('div');
+    row.className = `msg-row role-${role}`;
+    row.dataset.role = role;
+
+    // Build content HTML
+    let bodyHtml = '';
+
+    // OpenAI tool role
+    if (role === 'tool' || role === 'function') {
+      bodyHtml = renderToolResult(msg);
+    } else {
+      // Main content
+      bodyHtml += renderContent(msg.content, role);
+      // OpenAI tool_calls on assistant
+      if (msg.tool_calls?.length) {
+        bodyHtml += renderToolCalls(msg.tool_calls);
+      }
+    }
+
+    // Usage
+    if (msg.usage) bodyHtml += renderUsage(msg.usage);
+
+    // Additional unknown fields (show subtly)
+    const knownKeys = new Set(['role','content','tool_calls','tool_call_id','name','usage','id','is_error']);
+    const extra = Object.keys(msg).filter(k => !knownKeys.has(k));
+    if (extra.length) {
+      const id = newId();
+      const extraObj = {};
+      extra.forEach(k => extraObj[k] = msg[k]);
+      bodyHtml += `
+        <div class="block-thinking" style="margin-top:6px">
+          <div class="block-thinking-header collapsed" id="${id}-h" onclick="toggleBlock('${id}')" style="color:var(--text3)">
+            <span>ℹ</span> 附加字段 (${extra.join(', ')})
+            <em class="chevron" style="margin-left:auto;transform:rotate(-90deg)">▾</em>
+          </div>
+          <div class="block-thinking-content hidden" id="${id}-b">
+            ${syntaxHighlight(JSON.stringify(extraObj, null, 2))}
+          </div>
+        </div>`;
+    }
+
+    row.innerHTML = `
+      <div class="msg-avatar">${cfg.abbr}</div>
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span class="role-label">${cfg.label}</span>
+          <span class="msg-index">#${idx + 1}</span>
+          ${msg.tool_call_id ? `<span style="font-family:monospace;font-size:10px;color:var(--text3)">↩ ${esc(msg.tool_call_id)}</span>` : ''}
+          ${msg.name ? `<span style="font-family:monospace;font-size:10px;color:var(--green)">${esc(msg.name)}</span>` : ''}
+        </div>
+        <div class="msg-bubble">
+          ${bodyHtml || '<span style="color:var(--text3);font-style:italic">（无内容）</span>'}
+        </div>
+      </div>`;
+    container.appendChild(row);
+  });
+
+  // Update header stats
+  const meta = document.getElementById('viewer-meta');
+  const parts = [`<span><b>${messages.length}</b> 条消息</span>`];
+  Object.entries(roleCounts).forEach(([r, n]) => {
+    parts.push(`<span><b>${n}</b> ${ROLE_CONFIG[r]?.label || r}</span>`);
+  });
+  if (toolCallCount) parts.push(`<span><b>${toolCallCount}</b> 工具调用</span>`);
+  meta.innerHTML = parts.join('');
+
+  document.getElementById('viewer-header').style.display = '';
+  document.getElementById('viewer-toolbar').style.display = '';
+}
+
+// ── Parse & validate ──────────────────────────────────────────────────────────
+function parseAndRender(jsonStr) {
+  const errEl = document.getElementById('error-msg');
+  errEl.textContent = '';
+  if (!jsonStr.trim()) { errEl.textContent = '请输入 JSON'; return; }
+
+  let data;
+  try { data = JSON.parse(jsonStr); } catch(e) {
+    errEl.textContent = '❌ JSON 解析失败：' + e.message;
+    return;
+  }
+
+  // Accept array directly or { messages: [...] }
+  let messages;
+  if (Array.isArray(data)) {
+    messages = data;
+  } else if (data && Array.isArray(data.messages)) {
+    messages = data.messages;
+  } else {
+    errEl.textContent = '❌ 需要一个 messages 数组（或含 messages 字段的对象）';
+    return;
+  }
+
+  renderMessages(messages);
+}
+
+// ── Filtering ─────────────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const role = btn.dataset.role;
+    document.querySelectorAll('.msg-row').forEach(row => {
+      row.style.display = (role === 'all' || row.dataset.role === role) ? '' : 'none';
+    });
+  });
+});
+
+// ── Collapse all ──────────────────────────────────────────────────────────────
+document.getElementById('btn-collapse-all').addEventListener('click', () => {
+  const allBodies = document.querySelectorAll('[id$="-b"]');
+  const allHeaders = document.querySelectorAll('[id$="-h"]');
+  allBodies.forEach(b => b.classList.add('hidden'));
+  allHeaders.forEach(h => h.classList.add('collapsed'));
+});
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+function loadSample() {
+  document.getElementById('json-input').value = JSON.stringify(SAMPLE, null, 2);
+  parseAndRender(JSON.stringify(SAMPLE));
+}
+
+document.getElementById('btn-sample').addEventListener('click', loadSample);
+document.getElementById('btn-sample2')?.addEventListener('click', loadSample);
+document.getElementById('btn-clear').addEventListener('click', () => {
+  document.getElementById('json-input').value = '';
+  document.getElementById('error-msg').textContent = '';
+  document.getElementById('messages-container').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">💬</div>
+      <h2>Messages 可视化工具</h2>
+      <p>将 OpenAI 或 Anthropic 格式的 <code style="font-family:monospace;color:var(--purple2)">messages</code> JSON 数组粘贴到左侧，点击「渲染」查看可视化对话。</p>
+      <p style="margin-top:8px;font-size:12px">支持：多角色 · 工具调用 · 工具结果 · Thinking 块 · 图片 · 嵌套内容</p>
+      <button class="sample-btn" onclick="loadSample()">载入示例数据</button>
+    </div>`;
+  document.getElementById('viewer-header').style.display = 'none';
+  document.getElementById('viewer-toolbar').style.display = 'none';
+});
+document.getElementById('btn-parse').addEventListener('click', () => {
+  parseAndRender(document.getElementById('json-input').value);
+});
+
+// Ctrl+Enter / Cmd+Enter to render
+document.getElementById('json-input').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    parseAndRender(document.getElementById('json-input').value);
+  }
+});
+</script>
+</body>
+</html>

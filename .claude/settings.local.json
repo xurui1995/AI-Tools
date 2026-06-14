@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/rx/Claude/Projects/AI工具网站 status)",
+      "Bash(gh auth *)"
+    ]
+  }
+}

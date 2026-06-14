@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 工具箱</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f13;
+      color: #e8e8f0;
+      min-height: 100vh;
+    }
+    header {
+      border-bottom: 1px solid #1e1e2e;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #7c6af7, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .tagline {
+      color: #6b6b8a;
+      font-size: 14px;
+      margin-left: 4px;
+    }
+    main {
+      max-width: 960px;
+      margin: 60px auto;
+      padding: 0 24px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    h1 span {
+      background: linear-gradient(135deg, #7c6af7, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      color: #6b6b8a;
+      font-size: 16px;
+      margin-bottom: 48px;
+    }
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .tool-card {
+      background: #16161f;
+      border: 1px solid #1e1e2e;
+      border-radius: 16px;
+      padding: 28px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.2s, transform 0.15s;
+      display: block;
+    }
+    .tool-card:hover {
+      border-color: #7c6af7;
+      transform: translateY(-2px);
+    }
+    .tool-icon {
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+    .tool-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .tool-desc {
+      font-size: 14px;
+      color: #6b6b8a;
+      line-height: 1.6;
+    }
+    .tool-badge {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #1e1e2e;
+      color: #7c6af7;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">AI 工具箱</div>
+    <div class="tagline">开发者效率工具集</div>
+  </header>
+  <main>
+    <h1>给开发者的 <span>AI 工具</span></h1>
+    <p class="subtitle">一组实用的 AI 开发辅助工具，帮助你更高效地调试和理解 LLM 的行为。</p>
+    <div class="tools-grid">
+      <a href="message-viewer.html" class="tool-card">
+        <div class="tool-icon">💬</div>
+        <div class="tool-name">Messages 可视化</div>
+        <div class="tool-desc">将 OpenAI / Anthropic 格式的 messages JSON 渲染成直观的对话视图，支持工具调用、多角色、嵌套内容展示。</div>
+        <span class="tool-badge">调试工具</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
