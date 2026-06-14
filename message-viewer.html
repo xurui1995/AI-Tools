@@ -410,6 +410,30 @@
     .block-tool-result-body { border-top: 1px solid rgba(74,222,128,0.1); }
     .block-tool-result-body.hidden { display: none; }
 
+    /* Inline result section inside tool call card */
+    .block-tool-result-inline {
+      border-top: 1px solid rgba(74,222,128,0.2);
+      background: rgba(74,222,128,0.04);
+      padding: 8px 12px;
+    }
+    .block-tool-result-inline-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 4px;
+    }
+    .result-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
     /* Image block */
     .block-image img {
       max-width: 100%;
@@ -693,9 +717,29 @@ function syntaxHighlight(json) {
   });
 }
 
-let collapseState = {}; // id -> bool collapsed
+let collapseState = {};
 let blockIdCounter = 0;
+let resultMap = {};
 function newId() { return 'blk' + (++blockIdCounter); }
+
+function buildResultMap(messages) {
+  const map = {};
+  messages.forEach(msg => {
+    const role = (msg.role || '').toLowerCase();
+    if (role === 'tool' || role === 'function') {
+      const id = msg.tool_call_id || msg.name;
+      if (id) map[id] = { content: msg.content, isError: msg.is_error };
+    }
+    if (Array.isArray(msg.content)) {
+      msg.content.forEach(block => {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          map[block.tool_use_id] = { content: block.content, isError: block.is_error };
+        }
+      });
+    }
+  });
+  return map;
+}
 
 function toggleBlock(id) {
   const header = document.getElementById(id + '-h');
@@ -781,6 +825,8 @@ function renderBlock(block, role) {
   if (type === 'tool_use') {
     const id = newId();
     const inputJson = JSON.stringify(block.input || {}, null, 2);
+    const res = resultMap[block.id];
+    const resHtml = res ? renderInlineResult(res) : '';
     return `
       <div class="block-tool-call">
         <div class="block-tool-call-header" id="${id}-h" onclick="toggleBlock('${id}')">
@@ -791,6 +837,7 @@ function renderBlock(block, role) {
         </div>
         <div class="block-tool-call-body" id="${id}-b">
           <div class="json-viewer">${syntaxHighlight(inputJson)}</div>
+          ${resHtml}
         </div>
       </div>`;
   }
@@ -839,6 +886,20 @@ function renderBlock(block, role) {
   return `<div class="json-viewer">${syntaxHighlight(block)}</div>`;
 }
 
+function renderInlineResult(res) {
+  const resContent = typeof res.content === 'string'
+    ? `<div class="json-viewer" style="white-space:pre-wrap">${renderLongText(esc(res.content))}</div>`
+    : `<div class="json-viewer">${syntaxHighlight(res.content)}</div>`;
+  return `
+    <div class="block-tool-result-inline">
+      <div class="block-tool-result-inline-label">
+        <span class="result-dot"></span> Result
+        ${res.isError ? '<span class="block-error-badge">⚠ error</span>' : ''}
+      </div>
+      ${resContent}
+    </div>`;
+}
+
 function renderToolCalls(toolCalls) {
   if (!toolCalls || !toolCalls.length) return '';
   return toolCalls.map(tc => {
@@ -851,6 +912,8 @@ function renderToolCalls(toolCalls) {
     } catch {
       argsHtml = esc(fn.arguments || '');
     }
+    const res = resultMap[tc.id];
+    const resHtml = res ? renderInlineResult(res) : '';
     return `
       <div class="block-tool-call">
         <div class="block-tool-call-header" id="${id}-h" onclick="toggleBlock('${id}')">
@@ -861,6 +924,7 @@ function renderToolCalls(toolCalls) {
         </div>
         <div class="block-tool-call-body" id="${id}-b">
           <div class="json-viewer">${argsHtml}</div>
+          ${resHtml}
         </div>
       </div>`;
   }).join('');
@@ -907,6 +971,7 @@ let parsedMessages = [];
 function renderMessages(messages) {
   parsedMessages = messages;
   blockIdCounter = 0;
+  resultMap = buildResultMap(messages);
   const container = document.getElementById('messages-container');
   container.innerHTML = '';
 
@@ -921,6 +986,17 @@ function renderMessages(messages) {
 
   messages.forEach((msg, idx) => {
     const role = (msg.role || 'unknown').toLowerCase();
+
+    // Skip tool/function role messages — results are now inlined into tool calls
+    if (role === 'tool' || role === 'function') return;
+
+    // For user messages: filter out tool_result blocks (already inlined)
+    let displayContent = msg.content;
+    if (role === 'user' && Array.isArray(msg.content)) {
+      displayContent = msg.content.filter(b => b.type !== 'tool_result');
+      if (displayContent.length === 0 && !msg.tool_calls) return;
+    }
+
     roleCounts[role] = (roleCounts[role] || 0) + 1;
     if (msg.tool_calls?.length) toolCallCount += msg.tool_calls.length;
     if (Array.isArray(msg.content)) {
@@ -935,16 +1011,11 @@ function renderMessages(messages) {
     // Build content HTML
     let bodyHtml = '';
 
-    // OpenAI tool role
-    if (role === 'tool' || role === 'function') {
-      bodyHtml = renderToolResult(msg);
-    } else {
-      // Main content
-      bodyHtml += renderContent(msg.content, role);
-      // OpenAI tool_calls on assistant
-      if (msg.tool_calls?.length) {
-        bodyHtml += renderToolCalls(msg.tool_calls);
-      }
+    // Main content (use filtered displayContent for user messages)
+    bodyHtml += renderContent(displayContent, role);
+    // OpenAI tool_calls on assistant
+    if (msg.tool_calls?.length) {
+      bodyHtml += renderToolCalls(msg.tool_calls);
     }
 
     // Usage
@@ -1010,12 +1081,19 @@ function parseAndRender(jsonStr) {
     return;
   }
 
-  // Accept array directly or { messages: [...] }
+  // Accept array directly, { messages: [...] }, or full API request object
   let messages;
   if (Array.isArray(data)) {
     messages = data;
   } else if (data && Array.isArray(data.messages)) {
-    messages = data.messages;
+    messages = [...data.messages];
+    // Anthropic API: top-level system field → prepend as system message
+    if (data.system && !messages.some(m => m.role === 'system')) {
+      const sysContent = typeof data.system === 'string'
+        ? data.system
+        : data.system; // could be content block array
+      messages.unshift({ role: 'system', content: sysContent });
+    }
   } else {
     errEl.textContent = '❌ 需要一个 messages 数组（或含 messages 字段的对象）';
     return;
